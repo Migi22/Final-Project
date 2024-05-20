@@ -38,16 +38,19 @@
       };
     },
     methods: {
+      //starts the video
       async startVideo() {
         this.videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
         this.$refs.videoElement.srcObject = this.videoStream;
       },
+      //Stops the video
       stopVideo() {
         if (this.videoStream) {
           this.videoStream.getTracks().forEach((track) => track.stop());
           this.$refs.videoElement.srcObject = null;
         }
       },
+      //The one captures the video
       async captureFrame() {
         const videoCanvas = this.$refs.videoCanvas;
         const videoContext = videoCanvas.getContext("2d");
@@ -57,6 +60,7 @@
         const blob = await fetch(imageData).then((res) => res.blob());
         return blob;
       },
+      // The one processes and detects the Image from the captured image from camera
       async processImage(imageBlob) {
         try {
             this.loading = true;
@@ -77,7 +81,7 @@
             for (const detection of result) {
                 const { score, label } = detection;
                 const facts = await this.generateFacts(label);
-                const formattedResult = `Detected: ${label}, Confidence level: ${Math.round(score * 100)}%, ${facts}`;
+                const formattedResult = `Detected: ${label}, Confidence level: ${Math.round(score * 100)}%, Random Facts: ${facts}`;
                 this.result.push(formattedResult); // Push formatted result to result array
             }
 
@@ -95,8 +99,7 @@
             this.loading = false;
         }
       },
-
-
+      // The one draws boxes
       drawBoundingBox() {
         const videoCanvas = this.$refs.videoCanvas;
         const context = videoCanvas.getContext("2d");
@@ -120,6 +123,8 @@
         capturedContext.lineWidth = 2;
         capturedContext.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin);
       },
+      // The one captures the image and send to the API and the image will be save to the right video frame
+      // as captured image
       async captureImage() {
         const imageBlob = await this.captureFrame();
         this.processImage(imageBlob);
@@ -142,37 +147,41 @@
         };
         capturedImage.src = URL.createObjectURL(imageBlob);
       },
+      // The one gives the facts about the detected object
       async generateFacts(label) {
         try {
-            const data = { "inputs": `Can you give us a 5 facts about a ${label}` }; // Dummy data for debugging
-            const response = await fetch(
-                "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct",
-                {
-                    headers: {
-                        Authorization: "Bearer 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",
-                    },
-                    method: "POST",
-                    //body: JSON.stringify({ "inputs": `Can you please let us know more details about a ${label}` }),
-                    body: JSON.stringify(data),
-                }
-            );
-
-            // Check if response is successful
-            if (!response.ok) {
-                const errorMessage = `Error ${response.status}: ${response.statusText}`;
-                throw new Error(errorMessage);
+          const data = { inputs: `Did you know that, a ${label}` };
+          const response = await fetch(
+            "https://api-inference.huggingface.co/models/google/gemma-7b",
+            {
+              headers: {
+                Authorization: "Bearer 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",
+                "Content-Type": "application/json", // Ensure Content-Type is set
+              },
+              method: "POST",
+              body: JSON.stringify(data), // Ensure the body is correctly stringified
             }
+          );
 
-            const result = await response.json();
-            return result.generated_text;
+          if (!response.ok) {
+            const errorMessage = `Error ${response.status}: ${response.statusText}`;
+            throw new Error(errorMessage);
+          }
+
+          const result = await response.json();
+          console.log(result); // Log the entire response to inspect its structure
+
+          // Assuming the result contains a 'generated_text' key or similar
+          if (result.length > 0 && result[0].generated_text) {
+            return result[0].generated_text;
+          } else {
+            return "No facts generated";
+          }
         } catch (error) {
-            console.error("Error generating facts:", error);
-            return "Could not generate facts";
+          console.error("Error generating facts:", error);
+          return "Could not generate facts";
         }
-      },
-
-
-
+      }
     },
     beforeDestroy() {
       this.stopVideo();
