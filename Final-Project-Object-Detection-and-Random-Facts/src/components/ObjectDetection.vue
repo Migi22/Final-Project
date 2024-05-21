@@ -144,9 +144,9 @@ export default {
     },
     async generateFacts(label) {
       try {
-        const data = { inputs: `Did you know that, a ${label}` };
+        const data = { inputs: `A fact about a ${label}` };
         const response = await fetch(
-          "https://api-inference.huggingface.co/models/google/gemma-7b",
+          "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct",
           {
             headers: {
               Authorization: "Bearer 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",
