@@ -17,9 +17,7 @@
     <div v-if="loading">Loading...</div>
     <div v-else-if="result.length > 0">
       <ul>
-        <li v-for="(item, index) in result" :key="index">
-          {{ `${index + 1}. ${item}` }}
-        </li>
+        <li v-for="(item, index) in result" :key="index" v-html="item"></li>
       </ul>
     </div>
     <div v-else>No result yet.</div>
