@@ -19,10 +19,11 @@
       <ul>
         <li v-for="(item, index) in result" :key="index" v-html="item"></li>
       </ul>
-    </div>
+    </div>    
     <div v-else>No result yet.</div>
   </div>
 </template>
+
 
 <script>
 export default {
@@ -75,9 +76,15 @@ export default {
         for (const detection of result) {
           const { score, label, box } = detection;
           const facts = await this.generateFacts(label);
-          const formattedResult = `Detected: ${label}, Confidence level: ${Math.round(score * 100)}%, Random Facts: ${facts}`;
+          const color = this.colors[this.result.length % this.colors.length]; // Get color based on result index
+          const formattedResult = `
+            Detected: ${label}<br>
+            Color: ${color}<br>
+            Confidence level: ${Math.round(score * 100)}%<br>
+            Random Facts: ${facts}
+          `;
           this.result.push(formattedResult);
-          this.boundingBoxes.push({ box, label }); // Store the bounding box and label
+          this.boundingBoxes.push({ box, label, color });
         }
 
         this.loading = false;
@@ -159,7 +166,7 @@ export default {
         console.log(result);
 
         if (result.length > 0 && result[0].generated_text) {
-          return result[0].generated_text;
+          return result[0].generated_text.replace(/\n/g, ' '); // Replace new lines with <br> tags
         } else {
           return "No facts generated";
         }
@@ -178,3 +185,5 @@ export default {
 <style>
 /* Your styles here */
 </style>
+
+
