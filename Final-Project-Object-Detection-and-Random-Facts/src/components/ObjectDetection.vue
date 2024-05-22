@@ -1,29 +1,27 @@
 <template>
-  <div style="display: flex; flex-direction: column; align-items: center;">
-    <div style="display: flex;">
-      <div style="position: relative;">
-        <video ref="videoElement" width="400" height="300" autoplay></video>
-        <canvas ref="videoCanvas" width="400" height="300" style="position: absolute; top: 0; left: 0;"></canvas>
+  <div class="container">
+    <div class="video-container">
+      <div class="video-wrapper">
+        <video ref="videoElement" class="video-element" width="400" height="300" autoplay></video>
       </div>
-      <div style="margin-left: 20px;">
-        <canvas ref="capturedCanvas" width="400" height="300"></canvas>
+      <div class="captured-canvas-wrapper">
+        <canvas ref="capturedCanvas" class="captured-canvas" width="400" height="300"></canvas>
       </div>
     </div>
-    <div>
-      <button @click="startVideo">Start Video</button>
-      <button @click="stopVideo">Stop Video</button>
-      <button @click="captureImage">Capture Image</button>
+    <div class="buttons-container">
+      <button @click="startVideo" class="action-button">Start Video</button>
+      <button @click="stopVideo" class="action-button">Stop Video</button>
+      <button @click="captureImage" class="action-button">Capture Image</button>
     </div>
-    <div v-if="loading">Loading...</div>
-    <div v-else-if="result.length > 0">
+    <div v-if="loading" class="loading-text">Capturing Object, Please don't move...</div>
+    <div v-else-if="result.length > 0" class="result-list">
       <ul>
         <li v-for="(item, index) in result" :key="index" v-html="item"></li>
       </ul>
-    </div>    
-    <div v-else>No result yet.</div>
+    </div>
+    <div v-else class="no-result-text">No result yet.</div>
   </div>
 </template>
-
 
 <script>
 export default {
@@ -33,7 +31,15 @@ export default {
       result: [],
       videoStream: null,
       boundingBoxes: [],
-      colors: ['red', 'green', 'blue', 'yellow', 'purple', 'orange'], // Add more colors if needed
+      colors: ['red', 'green', 'blue', 'yellow', 'purple', 'orange'],
+      prompts: [
+        "Amazing fact about a",
+        "Interesting information about a",
+        "Did you know about a",
+        "Fun fact about a",
+        "Here's something cool about a",
+        "Learn something new about a"
+      ],
     };
   },
   methods: {
@@ -45,16 +51,24 @@ export default {
       if (this.videoStream) {
         this.videoStream.getTracks().forEach((track) => track.stop());
         this.$refs.videoElement.srcObject = null;
+        this.videoStream = null;
       }
     },
     async captureFrame() {
-      const videoCanvas = this.$refs.videoCanvas;
-      const videoContext = videoCanvas.getContext("2d");
-      videoContext.drawImage(this.$refs.videoElement, 0, 0, videoCanvas.width, videoCanvas.height);
+      const videoElement = this.$refs.videoElement;
+      const canvas = document.createElement("canvas");
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      const context = canvas.getContext("2d");
+      context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-      const imageData = videoCanvas.toDataURL("image/jpeg");
+      const imageData = canvas.toDataURL("image/jpeg");
       const blob = await fetch(imageData).then((res) => res.blob());
       return blob;
+    },
+    getRandomPrompt() {
+      const randomIndex = Math.floor(Math.random() * this.prompts.length);
+      return this.prompts[randomIndex];
     },
     async processImage(imageBlob) {
       try {
@@ -95,56 +109,43 @@ export default {
       }
     },
     drawBoundingBoxes() {
-      const videoCanvas = this.$refs.videoCanvas;
-      const context = videoCanvas.getContext("2d");
+      const videoElement = this.$refs.videoElement;
+      const capturedCanvas = this.$refs.capturedCanvas;
+      const context = capturedCanvas.getContext("2d");
 
-      context.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+      // Clear the canvas
+      context.clearRect(0, 0, capturedCanvas.width, capturedCanvas.height);
 
+      // Draw the current video frame on the canvas
+      context.drawImage(videoElement, 0, 0, capturedCanvas.width, capturedCanvas.height);
+
+      // Draw each bounding box
       this.boundingBoxes.forEach((detection, index) => {
         const { xmin, ymin, xmax, ymax } = detection.box;
         const color = this.colors[index % this.colors.length];
+
+        // Scale the coordinates
+        const scaleX = capturedCanvas.width / videoElement.videoWidth;
+        const scaleY = capturedCanvas.height / videoElement.videoHeight;
+
+        const scaledXMin = xmin * scaleX;
+        const scaledYMin = ymin * scaleY;
+        const scaledXMax = xmax * scaleX;
+        const scaledYMax = ymax * scaleY;
 
         context.strokeStyle = color;
         context.lineWidth = 2;
-        context.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin);
-      });
-
-      const capturedCanvas = this.$refs.capturedCanvas;
-      const capturedContext = capturedCanvas.getContext("2d");
-      capturedContext.drawImage(videoCanvas, 0, 0);
-
-      this.boundingBoxes.forEach((detection, index) => {
-        const { xmin, ymin, xmax, ymax } = detection.box;
-        const color = this.colors[index % this.colors.length];
-
-        capturedContext.strokeStyle = color;
-        capturedContext.lineWidth = 2;
-        capturedContext.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin);
+        context.strokeRect(scaledXMin, scaledYMin, scaledXMax - scaledXMin, scaledYMax - scaledYMin);
       });
     },
     async captureImage() {
       const imageBlob = await this.captureFrame();
       this.processImage(imageBlob);
-
-      const redrawVideoFrame = () => {
-        const videoCanvas = this.$refs.videoCanvas;
-        const videoContext = videoCanvas.getContext("2d");
-        videoContext.drawImage(this.$refs.videoElement, 0, 0, videoCanvas.width, videoCanvas.height);
-        requestAnimationFrame(redrawVideoFrame);
-      };
-      redrawVideoFrame();
-
-      const capturedCanvas = this.$refs.capturedCanvas;
-      const context = capturedCanvas.getContext("2d");
-      const capturedImage = new Image();
-      capturedImage.onload = () => {
-        context.drawImage(capturedImage, 0, 0, capturedCanvas.width, capturedCanvas.height);
-      };
-      capturedImage.src = URL.createObjectURL(imageBlob);
     },
     async generateFacts(label) {
       try {
-        const data = { inputs: `A fact about a ${label}` };
+        const prompt = this.getRandomPrompt();
+        const data = { inputs: `${prompt} ${label}` };
         const response = await fetch(
           "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct",
           {
@@ -166,7 +167,7 @@ export default {
         console.log(result);
 
         if (result.length > 0 && result[0].generated_text) {
-          return result[0].generated_text.replace(/\n/g, ' '); // Replace new lines with <br> tags
+          return result[0].generated_text.replace(/\n/g, ' '); // Replace new lines with spaces
         } else {
           return "No facts generated";
         }
@@ -183,7 +184,56 @@ export default {
 </script>
 
 <style>
-/* Your styles here */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.video-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.video-wrapper {
+  position: relative;
+}
+
+.video-element, .captured-canvas {
+  border: 1px solid #ccc;
+}
+
+.captured-canvas-wrapper {
+  margin-left: 20px;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.action-button {
+  margin: 0 10px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.loading-text {
+  margin-bottom: 10px;
+}
+
+.result-list {
+  margin-bottom: 10px;
+}
+
+.no-result-text {
+  font-style: italic;
+}
 </style>
-
-
